@@ -4,12 +4,11 @@
   ===  D L G    T R A C E  ===
   ============================
 
-	  rev 2.1   06/15/2015
-  J.W.G.  (filago on RCGroups)
+rev 2.1   06/15/2015
+	J.W.G.  (filago on RCGroups)
 
-	rev 2.2 10/09/2016
-A.A. Costerus
-
+rev 2.2 10/09/2016
+	A.A. Costerus
 
   LUA Script for OpenTX to graph altitude vs time with DLG launch.
   X-axis will automatically re-scale by +33% seconds if the max is reached.
