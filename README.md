@@ -1,2 +1,9 @@
 # DLG-F3K-script
-Testing the dlg script of the taranis
+Original script comes from RC-Settings and is ment for the Taranis radio. It adds a screen with a graph that can be used for DLG training.
+
+Original script is from J.W.G.  (filago on RCGroups) (rev 2.1   06/15/2015).
+I downloaded this from:
+http://rcsettings.com/index.php/viewdownload/13-lua-scripts/217-dlg-flight-graph-for-opentx-2-0-x
+
+I tried to get in contact with the owner but he has not reponded.
+I will make some changes to this to improve it. If the owner does not like this, please contact me so I will get this all down!
