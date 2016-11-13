@@ -7,6 +7,9 @@
 	  rev 2.1   06/15/2015
   J.W.G.  (filago on RCGroups)
 
+	rev 2.2 10/09/2016
+A.A. Costerus
+
 
   LUA Script for OpenTX to graph altitude vs time with DLG launch.
   X-axis will automatically re-scale by +33% seconds if the max is reached.
@@ -26,26 +29,23 @@
 --  ================================
 
 local yMaxInit = 40				-- initial max altitude on graph (m)
-local xMaxInit = 40				-- initial max time on graph (seconds)
+local xMaxInit = 30				-- initial max time on graph (seconds)
 local floorAlt = 2				-- altitude threshold for starting and stopping the flight (m)
+
 
 --  -----------------------------
 --	  the rest of the variables
 --  -----------------------------
 
 local alt_id = getFieldInfo("Alt").id	-- get field index # for telemetry Altitude
-local SH_id  = getFieldInfo("sh").id		-- get field index # for switch H (demo mode)
 local SF_id  = getFieldInfo("sf").id		-- get field index # for switch F (Tx launch mode)
 local thr_id = getFieldInfo("thr").id		-- get field index # for throttle stick
-local gv3_id = getFieldInfo("gvar3").id		-- get field index # for launch count
 local a1_id  = getFieldInfo("RxBt").id		-- get field index # for voltage
 local t1_id  = getFieldInfo("timer1").id	-- get field index # for timer 1 (seconds)
-local demo = 0					-- demo mode for code test; 0=off, 1=on (get Altitude from Thr stick)
---	note : demo mode is selectable on Tx with SEv
 local gLeft     = 15			-- starting column of graph
 local gWidth    = 138			-- width of graph data area, and array size
-local gRight    = gLeft+gWidth	-- ending column of graph
-local state     = 0				-- program state : 0=init/stop, 1=ready, 2=launch climb, 3=gliding
+local gRight    = gLeft+gWidth		-- ending column of graph
+local state     = 0			-- program state : 0=init/stop, 1=ready, 2=launch climb, 3=gliding
 local alts      = {}			-- array definition for graphed altitude values
 local startTime = 0				-- time at start of flight
 local fltTime					-- duration of each flight
@@ -53,9 +53,8 @@ local nowTime					-- current time
 local lnchAlt					-- top of launch
 local maxAlt					-- maximum altitude during flight
 local nowAlt					-- current altitude
-local swH						-- switch H value from Tx (>0 is down for demo mode)
 local swF						-- switch F value from Tx (<0 is UP for launch mode)
-local gv3 = 0					-- GV3 value from Tx (launch number)
+local lnchnr = 0 				-- launch counter
 local a1						-- voltage from Tx
 local timer1					-- timer 1 from Tx (sec > min)
 local index						-- array index position
@@ -92,40 +91,33 @@ end
 --  =======
 
 local function run(event)				-- this function will run until it is stopped
+	lcd.clear ()					-- clear the display
 
+	swF = getValue(SF_id)				-- (disabled) get value of switch F (Tx launch mode)
+	nowAlt = getValue(alt_id)			-- get current altitude from vario (m)
 
-	swH = getValue(SH_id)				-- get value of switch H (demo or not)
-	swF = getValue(SF_id)				-- get value of switch F (Tx launch mode)
-
-	if swH>0 then						-- if switch H is down
-		demo = 1								-- set demo mode ON
-		nowAlt = getValue(thr_id)/1024*50+50	-- get altitude from Thr stick (0-100 m)
-	else								-- otherwise
-		demo = 0								-- set demo mode OFF
-		nowAlt = getValue(alt_id)	--*3.28			-- get current altitude from vario (m)
-	end
 
 --  ----------------------------------
 --	  change program if needed
 --  ----------------------------------
 
 	if state == 0 and swF > 0 then					-- if SF was moved to launch mode from "init/stop" state
-		init()											-- reset graph data & scale
-		lcd.clear()										-- clear the display
-		gv3 = getValue(gv3_id)							-- get launch number from Tx (keep this here, because GV3 increments with launch detection)
-		state = 1										-- change state to "ready"
+		init()							-- reset graph data & scale
+		state = 1						-- change state to "ready"
 	elseif state == 1 and swF < 0 then				-- if launch mode is ended without a flight
-		state = 0										-- change state to "stop"
-	elseif state == 1 and nowAlt > floorAlt then	-- if launch detected in "ready" state
-		startTime = getTime()/100						-- set flight start time (seconds)
-		alts[1] = nowAlt								-- set first altitude point
-		index = 2										-- set index for 2nd alt point
-		state = 2										-- change state to "launch climb"
-	elseif state == 2 and nowAlt < maxAlt then		-- if in "launch climb" and altitude decreases
-		lnchAlt = maxAlt								-- set launch altitude
-		state = 3										-- set state = "gliding"
-	elseif state > 1 and nowAlt < floorAlt then	-- if "in flight" and altitude drops below X
-		state = 0										-- change state to "stop"
+		state = 0						-- change state to "stop"
+	elseif state == 1 and nowAlt > floorAlt then			-- if launch detected in "ready" state
+		startTime = getTime()/100				-- set flight start time (seconds)
+		alts[1] = nowAlt					-- set first altitude point
+		index = 2						-- set index for 2nd alt point
+		state = 2						-- change state to "launch climb"
+		lnchnr = lnchnr + 1					-- increment the launch number
+	elseif state == 2 and nowAlt < maxAlt then			-- if in "launch climb" and altitude decreases
+		lnchAlt = maxAlt					-- set launch altitude
+		state = 3						-- set state = "gliding"
+	elseif state > 1 and nowAlt < floorAlt then			-- if "in flight" and altitude drops below X
+		state = 0						-- change state to "stop"
+
 	end
 
 
@@ -155,8 +147,8 @@ local function run(event)				-- this function will run until it is stopped
 		if y-3 > 2 then								-- if number will fit on screen
 			lcd.drawNumber(15,y-3,i,SMLSIZE)				-- draw graph scale number
 		end
-		if y > 2 then									-- if horizonal line is below top of graph
-			lcd.drawLine(gLeft+1,y,gRight,y,SOLID,GREY_DEFAULT)	-- draw horizontal line
+		if y > 2 then								-- if horizonal line is below top of graph
+			lcd.drawLine(gLeft+1,y,gRight,y,SOLID,GREY_DEFAULT)		-- draw horizontal line
 		end
 	end
 
@@ -171,17 +163,17 @@ local function run(event)				-- this function will run until it is stopped
 
 	nowTime = getTime()/100							-- get current time (seconds since radio started)
 
-	if state>1 and nowTime>(startTime+index/xSpeed) then -- if "in flight" AND enough time has elapsed,
-		alts[index] = nowAlt							-- add current altitude to array
-		index = index+1									-- increment the index
+	if state>1 and nowTime>(startTime+index/xSpeed) then 			-- if "in flight" AND enough time has elapsed,
+		alts[index] = nowAlt						-- add current altitude to array
+		index = index+1							-- increment the index
 	end
 
 --	draw graph data
 	for i = 1, gWidth do
 		y = 64*(alts[i]-yMax)/(0-yMax)				-- calculate Y coordinate for graph point
 		if y < 63 then								-- don't draw if below graph, because grey point overwrites bottom line.
-			lcd.drawLine(gLeft+i,y  ,gLeft+i,62 ,SOLID,GREY_DEFAULT)	-- draw grey line down from altitude
-			lcd.drawLine(gLeft+i,y+1,gLeft+i,y-1,SOLID,0)				-- draw 3 pixel point for altitude
+			lcd.drawLine(gLeft+i,y  ,gLeft+i,62 ,SOLID,GREY_DEFAULT)	--  draw grey line down from altitude
+			lcd.drawLine(gLeft+i,y+1,gLeft+i,y,SOLID,0)				-- draw 2 pixel point for altitude
 		end
 	end
 
@@ -233,10 +225,10 @@ local function run(event)				-- this function will run until it is stopped
 	end
 
 	lcd.drawText  (162,  5,"LAUNCH   ", SMLSIZE+INVERS)
-	lcd.drawNumber(205,  5, gv3       , SMLSIZE+INVERS)
-	lcd.drawNumber(176, 16, lnchAlt   , SMLSIZE)
+	lcd.drawNumber(205,  5, lnchnr       , SMLSIZE+INVERS)
+	lcd.drawNumber(175, 16, lnchAlt   , SMLSIZE)
 	lcd.drawText  (177, 16,"m\194"    , SMLSIZE)		-- diagonal up-right arrow
-	lcd.drawNumber(201, 16, fltTime   , SMLSIZE)
+	lcd.drawNumber(200, 16, fltTime   , SMLSIZE)
 	lcd.drawText  (201, 16,"s"        , SMLSIZE)
 
 	if maxAlt>lnchAlt then								-- show max alt if > launch alt
@@ -250,12 +242,12 @@ local function run(event)				-- this function will run until it is stopped
 	lcd.drawNumber(179,     53, timer1, SMLSIZE)
 	lcd.drawText  (182,     53,"min"  , SMLSIZE)
 
-	lcd.drawNumber(gRight-12, 2, nowAlt, SMLSIZE+INVERS)
+	lcd.drawNumber(gRight-12, 2, nowAlt*10, SMLSIZE+INVERS+PREC1	)
 	lcd.drawText  (gRight-12, 2, " m" , SMLSIZE+INVERS)
 
-	if demo == 1 then										-- if in demo mode
-		lcd.drawText(gRight-20,10,"DEMO",SMLSIZE+INVERS+BLINK)	-- display this
-	end
+--	if demo == 1 then										-- if in demo mode
+--		lcd.drawText(gRight-20,10,"DEMO",SMLSIZE+INVERS+BLINK)	-- display this
+--	end
 
 end
 
