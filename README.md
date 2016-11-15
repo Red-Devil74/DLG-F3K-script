@@ -7,6 +7,7 @@ http://rcsettings.com/index.php/viewdownload/13-lua-scripts/217-dlg-flight-graph
 
 I have had contact with him and he is fine if with it if I try tho get the script a bit further
 
-ne RC-settings page is here:
+New RC-settings page is here:
+http://rcsettings.com/index.php/viewdownload/13-lua-scripts/278-dlg-flight-graph-for-opentx-2-2
 
 I will make some changes to this to improve it. If the owner does not like this, please contact me so I will get this all down!
