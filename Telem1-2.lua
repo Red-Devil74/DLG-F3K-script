@@ -39,10 +39,17 @@ floorAlt = 2				-- altitude threshold for starting and stopping the flight (m)
 --  -----------------------------
 --	  the rest of the variables
 --  -----------------------------
---alt_id = getFieldInfo("Alt").id		-- get field index # for telemetry Altitude
+
+value = getFieldInfo('Alt')	--Get field info value
+	if value ~= nil then
+	alt_id = getFieldInfo('Alt').id 	-- --Get .id from field index only if value is not equal to nil
+	end 
 SF_id  = getFieldInfo("sf").id		-- get field index # for switch F (Tx launch mode)
 thr_id = getFieldInfo("thr").id		-- get field index # for throttle stick
---a1_id  = getFieldInfo("RxBt").id	-- get field index # for voltage
+value = getFieldInfo('RxBt')
+	if value ~= nil then
+	a1_id  = getFieldInfo("RxBt").id	-- get field index # for voltage
+	end
 t1_id  = getFieldInfo("timer1").id	-- get field index # for timer 1 (seconds)
 gLeft     = 40						-- starting column of graph
 gWidth    = 400						-- width of graph data area, and array size
