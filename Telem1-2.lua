@@ -39,7 +39,6 @@ floorAlt = 2				-- altitude threshold for starting and stopping the flight (m)
 --  -----------------------------
 --	  the rest of the variables
 --  -----------------------------
-
 value = getFieldInfo('Alt')	--Get field info value
 	if value ~= nil then
 	alt_id = getFieldInfo('Alt').id 	-- --Get .id from field index only if value is not equal to nil
@@ -204,10 +203,6 @@ function mainCode(context)				-- this function will run until it is stopped
 			lcd.drawLine(gLeft+i,y  ,gLeft+i,62 ,SOLID,GREY)			-- draw grey line down from altitude
 			lcd.drawLine(gLeft+i,y+1,gLeft+i,y,SOLID,0)					-- draw 2 pixel point for altitude
 		end
+	end
 end
-
-
-end
-
-
 return { name="Test", options=options, create=create, update=update, refresh=refresh, background=background }
