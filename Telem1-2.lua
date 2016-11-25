@@ -39,20 +39,26 @@ floorAlt = 2				-- altitude threshold for starting and stopping the flight (m)
 --  -----------------------------
 --	  the rest of the variables
 --  -----------------------------
-value = getFieldInfo('Alt')	--Get field info value
+value = getFieldInfo("Alt")			-- Get field info value
 	if value ~= nil then
-	alt_id = getFieldInfo('Alt').id 	-- --Get .id from field index only if value is not equal to nil
+	vario = value.id 				-- Get .id from field index only if value is not equal to nil
+	else
+	vario=258
+--alt_id = 258					--Unable to get this to work. temp hardcode current ID in.... fix later
 	end 
 SF_id  = getFieldInfo("sf").id		-- get field index # for switch F (Tx launch mode)
 thr_id = getFieldInfo("thr").id		-- get field index # for throttle stick
-value = getFieldInfo('RxBt')
-	if value ~= nil then
-	a1_id  = getFieldInfo("RxBt").id	-- get field index # for voltage
-	end
+--value = getFieldInfo("RxBt")
+--	if value ~= nil then
+--	a1_id  = value.id				-- get field index # for voltage
+--	else
+--	a1_id = 252						--Unable to get this to work. temp hardcode current ID in.... fix later
+--	end
 t1_id  = getFieldInfo("timer1").id	-- get field index # for timer 1 (seconds)
-gLeft     = 40						-- starting column of graph
-gWidth    = 400						-- width of graph data area, and array size
-gRight    = gLeft+gWidth			-- ending column of graph
+gLeft     = 55						-- starting column of graph
+gWidth    = 300						-- width of graph data area, and array size
+gRight    = gLeft+gWidth			-- ending column of 
+gHeight = 0 						-- Height of graph
 state     = 0						-- program state : 0=init/stop, 1=ready, 2=launch climb, 3=gliding
 alts      = {}						-- array definition for graphed altitude values
 startTime = 0						-- time at start of flight
@@ -72,6 +78,8 @@ xSpeed	=0							-- X-axis speed (pixels/second)
 y		=0							-- temp use for calculating Y coordinate
 yMax	=0							-- Y-axis max value (m)
 yScale	=0							-- Y-axis marker interval (sec)
+menuBar	= 50						-- set height of the menuBar
+gHeight	= 180				-- set initial graph Height
 
 --  ==============
 --	create initialiseert een nieuwe instantie van de widget 
@@ -97,7 +105,7 @@ end
 -- ===============
 
 function refresh(context)
-	initialiseer(context)
+	init(context)
 	mainCode(context)
 end
 
@@ -112,7 +120,7 @@ end
 -- end of main blocks. below blocks will be called above
 -- ==============
 
-function initialiseer(context)
+function init(context)
 	for i = 1, gWidth do
 		alts[i] = -10			-- set altitude array values to be below the visible graph range
 	end
@@ -125,18 +133,19 @@ function initialiseer(context)
 	maxAlt = 0					-- reset flight max altitude
 	fltTime = 0					-- reset flight duration
 	index = 1					-- set initial array position
+
 end
 
 function mainCode(context)				-- this function will run until it is stopped
 --	lcd.clear ()					-- clear the display
-	swF = getValue(SF_id)				-- (disabled) get value of switch F (Tx launch mode)
-	--nowAlt = getValue(alt_id)			-- get current altitude from vario (m)
+	swF = getValue(SF_id)				-- get value of switch F (Tx launch mode)
+	nowAlt = getValue(vario)			-- get current altitude from vario (m)
 
 --  ----------------------------------
 --	  change program if needed
 --  ----------------------------------
 	if state == 0 and swF > 0 then					-- if SF was moved to launch mode from "init/stop" state
-		initialiseer(context)						-- reset graph data & scale
+		init(context)								-- reset graph data & scale
 		state = 1									-- change state to "ready"
 	elseif state == 1 and swF < 0 then				-- if launch mode is ended without a flight
 		state = 0									-- change state to "stop"
@@ -169,11 +178,11 @@ function mainCode(context)				-- this function will run until it is stopped
 --  -----------------------------------
 --	  draw the static graph elements
 --  -----------------------------------
-	lcd.drawRectangle(gLeft,50,gWidth+2,180)						-- graph perimeter
-	for i = yScale, yMax, yScale do									-- create Y-axis scale
-		y = (180+50)*(i-yMax)/(0-yMax)								-- calculate y coordinates
+	lcd.drawRectangle(gLeft,menuBar,gWidth+2,gHeight,SOLID)					-- graph perimeter
+	for i = yScale, yMax, yScale do									-- create Y-axis scale (For i goes from 10 to 40 with steps of 10)
+		y = menuBar+(gHeight*(i-yMax)/(0-yMax))						-- calculate y coordinates
 		if y-3 > 2 then												-- if number will fit on screen
-			lcd.drawNumber(gLeft+5,y-3,i,SMLSIZE)					-- draw graph scale number
+			lcd.drawNumber(gLeft-18,y-8,i,SMLSIZE)					-- draw graph scale number
 		end		
 		if y > 2 then												-- if horizonal line is below top of graph
 			lcd.drawLine(gLeft+1,y,gRight,y,DOTTED,GREY)			-- draw horizontal line
@@ -181,7 +190,7 @@ function mainCode(context)				-- this function will run until it is stopped
 	end
 
 	for i = xScale*xSpeed, gWidth, xScale*xSpeed do					-- create X-axis scale lines
-		lcd.drawLine(gLeft+i+1,50,gLeft+i+1,(180+50),DOTTED,GREY)	-- vert lines
+		lcd.drawLine(gLeft+i,menuBar,gLeft+i,(gHeight+menuBar),DOTTED,GREY)	-- vert lines
 	end
 
 --  ---------------------------
@@ -197,12 +206,93 @@ function mainCode(context)				-- this function will run until it is stopped
 --  ---------------------------
 --	draw graph data
 --  ---------------------------
+	lcd.setColor (CUSTOM_COLOR,RED)
 	for i = 1, gWidth do
-		y = (180+50)*(alts[i]-yMax)/(0-yMax)							-- calculate Y coordinate for graph point
-		if y < (180+50) then											-- don't draw if below graph, because grey point overwrites bottom line.
-			lcd.drawLine(gLeft+i,y  ,gLeft+i,62 ,SOLID,GREY)			-- draw grey line down from altitude
-			lcd.drawLine(gLeft+i,y+1,gLeft+i,y,SOLID,0)					-- draw 2 pixel point for altitude
+		y = menuBar+(gHeight*(alts[i]-yMax)/(0-yMax))					-- calculate Y coordinate for graph point
+		if y < (gHeight+menuBar) then									-- don't draw if below graph, because grey point overwrites bottom line.
+--			lcd.drawLine(gLeft+i,y,gLeft+i,(menuBar+gHeight),SOLID,GREY)				-- draw grey line down from altitude
+			lcd.drawLine(gLeft+i,y+1,gLeft+i,y,SOLID,CUSTOM_COLOR)					-- draw 2 pixel point for altitude
 		end
 	end
+
+--  ----------------------------------------------------
+--	  if the graph maximum X is reached, re-scale in X
+--  ----------------------------------------------------
+	if index > gWidth  then												-- if graph is full,
+
+		j = 1															-- temporary index number for compacted array
+		for i = 1, gWidth do											-- compact the array, skipping every 4th point
+			if i % 4 ~= 0 then											-- if not every 4th point
+				alts[j] = alts[i]										-- copy to compacted array
+				j = j+1													-- increment j
+			end
+		end
+
+		for i= j, gWidth do												-- reset the "empty" data at the end so it doesn't plot
+			alts[i] = -10
+		end
+
+		index = j														-- set index to first "empty" location
+		xMax = xMax * 4/3												-- new graph max time (sec)
+		xSpeed = gWidth/xMax											-- new graph speed (pixels/sec)
+
+		-- check the scale marker count, and adjust if needed
+		xScale = 10														-- start with marker interval = 10 seconds
+		while xMax/xScale > 7 do										-- as long as there would be more than 7 of them
+			xScale = xScale+10											-- increase the marker interval by 10 seconds
+		end
+	end
+
+--  --------------------------------
+--	  calculate and display values
+--  --------------------------------
+--	a1 = getValue(a1_id)												-- get voltage from the Tx
+	timer1 = getValue(t1_id/60)											-- get timer1 value from the Tx (sec > min)
+	if state > 1 then													-- if in a flight state
+		fltTime = nowTime-startTime										-- calculate the flight duration (sec)
+		maxAlt = math.max (nowAlt,maxAlt)								-- update maximum altitude
+	end
+
+	if state == 2 then													-- if state is "launch climb"
+		lnchAlt = nowAlt												-- update launch altitude with current alt
+	end
+
+	lcd.drawText  (gRight+5,  menuBar,"Launch#: ", SMLSIZE+INVERS)		--show launch nr
+	lcd.drawNumber(gRight+75,  menuBar, lnchnr, SMLSIZE+INVERS)
+--
+	lcd.drawText(gRight+5, menuBar+20, "Launch\194", SMLSIZE)			-- Launch height. diagonal up-right arrow
+	lcd.drawNumber(gRight+65, menuBar+20, lnchAlt, SMLSIZE)	
+	lcd.drawText(gRight+77, menuBar+20, "m", SMLSIZE)
+--
+	lcd.drawText(gRight+5, menuBar+40, "Time:", SMLSIZE)
+	lcd.drawNumber(gRight+65, menuBar+40, fltTime, SMLSIZE)
+	lcd.drawText  (gRight+83, menuBar+40,"s", SMLSIZE)
+
+	if maxAlt>lnchAlt then											-- show max alt if > launch alt
+		lcd.drawNumber(gRight+30, menuBar+30, maxAlt, SMLSIZE)
+		lcd.drawText  (gRight+40, menuBar+30,"m\192", SMLSIZE)		-- up arrow, or use char "^" for max alt
+	end
+	lcd.drawLine  (gRight+5,menuBar+60,440,menuBar+60 ,SOLID,1)			-- line below current flight values
+--	lcd.drawText(gRight+5,menuBar+80, a1*100.."V", SMLSIZE+PREC2)					-- battery voltage
+--	lcd.drawText  (gRight+55,menuBar+80,"V"    , SMLSIZE)
+	lcd.drawNumber(gRight+5,     menuBar+80, timer1, SMLSIZE)
+	lcd.drawText  (gRight+55,     menuBar+80,"min"  , SMLSIZE)
+--
+	lcd.drawNumber(gRight-60, menuBar, nowAlt*10, SMLSIZE+INVERS+PREC1)
+	lcd.drawText  (gRight-30, menuBar, " m" , SMLSIZE+INVERS)
+	lcd.drawText (gRight+5,menuBar+100, state ,SMLSIZE+INVERS)
+	if nowAlt > floorAlt then
+		lcd.drawText (gLeft,menuBar+120, "nowalt("..nowAlt..") > ".."flooralt ("..floorAlt..")" ,SMLSIZE)
+		else
+		lcd.drawText (gLeft,menuBar+120, "nowalt("..nowAlt..") < ".."flooralt ("..floorAlt..")" ,SMLSIZE)
+	end
+
+
 end
+
+
+
+
+
+
 return { name="Test", options=options, create=create, update=update, refresh=refresh, background=background }
