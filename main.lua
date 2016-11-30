@@ -313,17 +313,8 @@ function draw (context)
 	
 --
 	lcd.drawText (gRight+5,menuBar+160, "Phase: " ,SMLSIZE+INVERS)		--Show the various "states" of flight to aid in debugging 
-	if state == 0 then
-		lcd.drawText (gRight+55,menuBar+160, "Initialised" ,SMLSIZE+INVERS)
-	elseif state == 1 then
-		lcd.drawText (gRight+55,menuBar+160, "Ready" ,SMLSIZE+INVERS)	
-	elseif state == 2 then
-		lcd.drawText (gRight+55,menuBar+160, "Launch!" ,SMLSIZE+INVERS)	
-	elseif state == 3 then
-		lcd.drawText (gRight+55,menuBar+160, "Gliding" ,SMLSIZE+INVERS)
-	elseif state == -1 then
-		lcd.drawText (gRight+55,menuBar+160, "Stopped" ,SMLSIZE+INVERS)
-	end
+	stateTxt = {"Stopped","Initialised","Ready","Launch!","Gliding"}
+	lcd.drawText (gRight+55,menuBar+160, stateTxt[state+2] ,SMLSIZE+INVERS)
 end
 
 return { name="F3K", options=options, create=create, update=update, refresh=refresh, background=background }
