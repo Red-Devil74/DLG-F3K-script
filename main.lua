@@ -6,7 +6,7 @@
 rev 2.1   06/15/2015
 	J.W.G.  (filago on RCGroups)
 
-rev 3.0.1 20/11/2016
+rev 3.0.2 14/12/2016
 	A.A. Costerus
 
   Rewrite of openTX code of a 2.1 script to a OpenTX 2.2 widget!
@@ -35,11 +35,11 @@ rev 3.0.1 20/11/2016
 -- ==============
 local options = {
 	{ "Color", COLOR, WHITE },
-	{ "Shadow", COLOR, BLACK },
+	{ "Shadow", COLOR, GREY },
 	{ "Altitude", SOURCE, 1 },
 	{ "RxBat", SOURCE,1},
 	{ "Timer", SOURCE,1}
-	--{ "Threshld", VALUE, 2,0,10}
+
 }
 
 --  ================================
@@ -47,7 +47,6 @@ local options = {
 --  ================================
 yMaxInit = 30				-- initial max altitude on graph (m)
 xMaxInit = 40				-- initial max time on graph (seconds)
---floorAlt = tonumber(options.Threshld)				-- altitude threshold for starting and stopping the flight (m)
 floorAlt = 2				-- altitude threshold for starting and stopping the flight (m)
 
 --  -----------------------------
@@ -80,12 +79,16 @@ yScale	=10							-- Y-axis marker interval (sec)
 menuBar	= 50						-- set height of the menuBar
 gHeight	= 180						-- set initial graph Height
 flghtTime = 0						-- FlightTimer display 
-nMins=0
-nSecs=0
-maxHeightHistory={}					-- array for height history
-launchHeightHistory={}				-- array for launch height
-launchNrHistory={}					-- array fro launch nr
-durationHistory={}					-- array for flight duration history
+nMins=0								-- used for displaying time propperly
+nSecs=0								-- used for displaying time propperly
+history = {}						-- tabel for historical data
+recordValues = {}					-- tabel for the best values
+	recordValues["maxAlt"]=0	-- set record values to 0
+	recordValues["lnchAlt"]=0
+	recordValues["fltTime"]=0
+--nxtRow=0							--variable for displaying text propperly
+rowHeight=16						--standard row height
+
 	for i = 1, gWidth do
 		alts[i] = -10			-- set altitude array values to be below the visible graph range
 	end
@@ -143,18 +146,19 @@ function init (context)
 	maxAlt = 0					-- reset flight max altitude
 	fltTime = 0					-- reset flight duration
 	index = 1					-- set initial array position
+
 end
 
 -- ---------------------------
 -- custom function to propperly disply timers
 -- ---------------------------
-	local function SecondsToClock(seconds)
+	local function SecondsToClock (seconds)
 		local seconds = tonumber(seconds)
 		if seconds <= 0 then
 			return "00:00"
 		else
-			mins = string.format("%02.f", math.floor(seconds/60))
-			secs = string.format("%02.f", math.floor(seconds -  mins *60))
+			mins = string.format ("%02.f", math.floor (seconds/60))
+			secs = string.format ("%02.f", math.floor (seconds -  mins *60))
 		return mins..":"..secs
 		end
 	end
@@ -190,10 +194,28 @@ function maincode (context)				-- this function will run until it is stopped
 		lnchAlt = maxAlt							-- set launch altitude
 		state = 3									-- set state = "gliding"
 	elseif state > 1 and nowAlt < floorAlt then		-- if "in flight" and altitude drops below X
-		maxHeightHistory[lnchnr]	=maxAlt			-- Add launch data to history file
-		launchHeightHistory[lnchnr]	=lnchAlt		--
-		launchNrHistory[lnchnr]		= lnchnr		-- 
-		durationHistory[lnchnr]		= fltTime
+	-- =======
+	-- Displaying history
+	-- =======
+		history[lnchnr]={}							-- declare history table as a "struct"(?)
+		history[lnchnr]["maxAlt"] = maxAlt			-- fill the current maxAlt in the row corresponding with the flight number
+		history[lnchnr]["lnchAlt"] = lnchAlt		-- fill the current Launch alt. in the row corresponding with the flight number
+		history[lnchnr]["fltTime"] = fltTime		-- fill the current flight time in the row corresponding with the flight number
+	
+	-- =============================
+	-- put record values in table
+	-- =============================
+		if maxAlt>recordValues["maxAlt"] then
+			recordValues["maxAlt"]=maxAlt
+		end
+		if lnchAlt>recordValues["lnchAlt"] then
+			recordValues["lnchAlt"]=lnchAlt
+		end
+		if fltTime>recordValues["fltTime"] then
+			recordValues["fltTime"]=fltTime
+		end
+
+
 		state = -1									-- change state to "stop" but keep graph on screen
 	elseif state == -1 and swF > 0	then							-- motivate script to initialise, clear graph and go to state 0
 			state = 0	
@@ -254,7 +276,10 @@ function draw (context)
 --  -----------------------------------
 --	  draw the static graph elements
 --  -----------------------------------
-	lcd.drawRectangle (gLeft,menuBar,gWidth,gHeight,SOLID)					-- graph perimeter
+	lcd.setColor (CUSTOM_COLOR, context.options.Shadow)
+	lcd.drawFilledRectangle (gLeft+1,menuBar+1,gWidth-1,gHeight-1, CUSTOM_COLOR)
+	lcd.drawRectangle (gLeft,menuBar,gWidth,gHeight,SOLID)						-- graph perimeter
+
 	for i = yScale, yMax, yScale do												-- create Y-axis scale (For i goes from 10 to 40 with steps of 10)
 		y = menuBar+(gHeight*(i-yMax)/(0-yMax))									-- calculate y coordinates
 		if y-3 > 2 then															-- if number will fit on screen
@@ -289,7 +314,7 @@ function draw (context)
 
 	timer1 = getValue (context.options.Timer)								-- get timer1 value from the Tx (sec)
 	if state > 1 then														-- if in a flight state
-		fltTime = nowTime-startTime											-- calculate the flight duration (sec)
+		fltTime = nowTime-startTime						-- calculate the flight duration (min:sec)
 		maxAlt = math.max (nowAlt,maxAlt)									-- update maximum altitude
 	end
 
@@ -303,44 +328,55 @@ function draw (context)
 	lcd.drawText  (gRight+5,  menuBar,"Launch#: ", SMLSIZE+INVERS)			--show launch nr
 	lcd.drawNumber (gRight+75,  menuBar, lnchnr, SMLSIZE+INVERS)
 --
-	lcd.drawText (gRight+5, menuBar+20, "Launch\194", SMLSIZE)				-- Launch height. diagonal up-right arrow
-	lcd.drawNumber (gRight+75, menuBar+20, lnchAlt, SMLSIZE)	
-	lcd.drawText (gRight+95, menuBar+20, "m", SMLSIZE)
+	lcd.drawText (gRight+5, menuBar+rowHeight, "Launch\194", SMLSIZE)				-- Launch height. diagonal up-right arrow
+	lcd.drawNumber (gRight+75, menuBar+rowHeight, lnchAlt, SMLSIZE)	
+	lcd.drawText (gRight+95, menuBar+rowHeight, "m", SMLSIZE)
 --
-	lcd.drawText (gRight+5, menuBar+40, "Time:", SMLSIZE)					-- Flighttime of this launch
-	lcd.drawText (gRight+70, menuBar+40,SecondsToClock (fltTime) , SMLSIZE)
 
-	lcd.drawText  (gRight+5, menuBar+60,"Max Alt\192:", SMLSIZE)			-- placeholder for MaxAlt. up arrow, or use char "^" for max alt
-	lcd.drawText  (gRight+95, menuBar+60,"m", SMLSIZE)						--
+	lcd.drawText  (gRight+5, menuBar+2*rowHeight,"Max Alt\192:", SMLSIZE)			-- placeholder for MaxAlt. up arrow, or use char "^" for max alt
+	lcd.drawText  (gRight+95, menuBar+2*rowHeight,"m", SMLSIZE)	
 
 	if maxAlt>lnchAlt then													-- show max alt if > launch alt
-		lcd.drawNumber (gRight+75, menuBar+60, maxAlt, SMLSIZE)
+		lcd.drawNumber (gRight+75, menuBar+2*rowHeight, maxAlt, SMLSIZE)
 	end
+						--
+	lcd.drawText (gRight+5, menuBar+3*rowHeight, "Time:", SMLSIZE)					-- Flighttime of this launch
+	lcd.drawText (gRight+70, menuBar+3*rowHeight,SecondsToClock (fltTime), SMLSIZE)
 
-	lcd.drawLine  (gRight+5,menuBar+80,440,menuBar+80 ,SOLID,1)				-- line below current flight values
---	lcd.drawNumber (gRight+5,menuBar+85, a1*100, SMLSIZE+PREC2)				-- battery voltage
---	lcd.drawText  (gRight+55,menuBar+85,"V"    , SMLSIZE)
+	lcd.drawLine  (gRight+3,menuBar+4*rowHeight,440,menuBar+4*rowHeight ,SOLID,1)				-- line below current flight values
+
 --
 	if lnchnr > 1 then
-		lcd.drawText (gRight+5,menuBar+85, "last flight #"..lnchnr-1 ,SMLSIZE+INVERS)		-- Show flight history
-		lcd.drawText ( gRight+5,menuBar+105, "Max hght:",SMLSIZE)
-		lcd.drawNumber ( gRight+80,menuBar+105, maxHeightHistory[lnchnr-1], SMLSIZE)
-		lcd.drawText (gRight+100, menuBar+105, "m", SMLSIZE)
+		lcd.drawText (gRight+5,menuBar+4*rowHeight, "last flight #"..lnchnr-1 ,SMLSIZE+INVERS)		-- Show flight history
 
-		lcd.drawText ( gRight+5,menuBar+125, "Launched:",SMLSIZE)	
-		lcd.drawNumber ( gRight+80,menuBar+125, launchHeightHistory[lnchnr-1], SMLSIZE)
-		lcd.drawText (gRight+100, menuBar+125, "m", SMLSIZE)	
-		--launchNrHistory[lnchnr] 
-		lcd.drawText ( gRight+5,menuBar+145, "Duration:",SMLSIZE)
-		lcd.drawText ( gRight+75,menuBar+145, SecondsToClock (durationHistory[lnchnr-1]), SMLSIZE)
-	--	lcd.drawText (gRight+100, menuBar+145, "s", SMLSIZE)		
+		lcd.drawText ( gRight+5,menuBar+5*rowHeight, "Launch\194:",SMLSIZE)	
+		lcd.drawNumber ( gRight+80,menuBar+5*rowHeight, history[lnchnr-1]["lnchAlt"], SMLSIZE)
+		lcd.drawText (gRight+100, menuBar+5*rowHeight, "m", SMLSIZE)
+				
+		lcd.drawText ( gRight+5,menuBar+6*rowHeight, "Max\192:",SMLSIZE)
+		lcd.drawNumber ( gRight+80,menuBar+6*rowHeight, history[lnchnr-1]["maxAlt"], SMLSIZE)
+		lcd.drawText (gRight+100, menuBar+6*rowHeight, "m", SMLSIZE)
+	
+		lcd.drawText ( gRight+5,menuBar+7*rowHeight, "Time:",SMLSIZE)
+		lcd.drawText ( gRight+75,menuBar+7*rowHeight, SecondsToClock (history[lnchnr-1]["fltTime"]), SMLSIZE)
 	end
+	lcd.drawLine  (gRight+3,menuBar+8*rowHeight-2,440,menuBar+8*rowHeight-2,SOLID,1)				-- line below last flight values
+
+	lcd.drawText ( gRight+5,menuBar+8*rowHeight, "Max Values",SMLSIZE+INVERS)							-- Show max values
+	lcd.drawText ( gRight+5,menuBar+9*rowHeight, "\194",SMLSIZE+INVERS)									-- Show max values
+	lcd.drawText ( gRight+40,menuBar+9*rowHeight, "\192",SMLSIZE+INVERS)								-- Show max values
+	lcd.drawText ( gRight+75,menuBar+9*rowHeight, "Time",SMLSIZE+INVERS)								-- Show max values
+
+	lcd.drawNumber ( gRight+3,menuBar+10*rowHeight, tonumber (recordValues["lnchAlt"]),SMLSIZE)			-- Show max values
+	lcd.drawText ( gRight+21,menuBar+10*rowHeight, "m",SMLSIZE)											-- Show max values
+	lcd.drawNumber ( gRight+40,menuBar+10*rowHeight, tonumber (recordValues["maxAlt"]),SMLSIZE)			-- Show max values
+	lcd.drawText ( gRight+58,menuBar+10*rowHeight, "m",SMLSIZE)											-- Show max values
+	lcd.drawText ( gRight+75,menuBar+10*rowHeight, SecondsToClock (recordValues["fltTime"]),SMLSIZE)	-- Show max values
 
 
-
-	lcd.drawText (gLeft+5,menuBar+160, "Phase: " ,SMLSIZE+INVERS)		--Show the various "states" of flight to aid in debugging 
+	lcd.drawText (gLeft+5,menuBar+10*rowHeight, "Phase: " ,SMLSIZE+INVERS)		--Show the various "states" of flight to aid in debugging 
 	stateTxt = {"Stopped","Initialised","Ready","Launch!","Gliding"}
-	lcd.drawText (gLeft+55,menuBar+160, stateTxt[state+2] ,SMLSIZE+INVERS)
+	lcd.drawText (gLeft+55,menuBar+10*rowHeight, stateTxt[state+2] ,SMLSIZE+INVERS)
 end
 
 return { name="F3K", options=options, create=create, update=update, refresh=refresh, background=background }
