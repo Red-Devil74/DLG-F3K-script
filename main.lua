@@ -296,13 +296,25 @@ function draw (context)
 --  ---------------------------
 --	draw graph data
 --  ---------------------------
+	
 	lcd.setColor (CUSTOM_COLOR,RED)
-	for i = 1, gWidth do
+	
+--	previous_xPos = gLeft
+	previous_yPos = menuBar+gHeight
+	
+	for i = 1, gWidth,1 do
+--		xPos = gLeft+i
+--		yPos = menuBar+(gHeight*(alts[i]-yMax)/(0-yMax))						-- calculate Y coordinate for graph point
+		
 		y = menuBar+(gHeight*(alts[i]-yMax)/(0-yMax))					-- calculate Y coordinate for graph point
-		if y < (gHeight+menuBar-1) then									-- don't draw if below graph, because grey point overwrites bottom line.
---			lcd.drawLine (gLeft+i	,y+1,	gLeft+i,	(menuBar+gHeight-1),	SOLID,	GREY)				-- draw grey line down from altitude
-			lcd.drawLine (gLeft+i	,y+1,	gLeft+i,	y-1,					SOLID,	CUSTOM_COLOR)					-- draw 3 pixel point for altitude
+				
+		if y < (gHeight+menuBar-1) then										-- don't draw if below graph, because grey point overwrites bottom line.
+			lcd.drawLine (gLeft+i-1,previous_yPos,gLeft+i,y,SOLID,CUSTOM_COLOR)		-- draw 3 pixel point for altitude
+--			lcd.drawLine (previous_xPos,previous_yPos,xPos,yPos,SOLID,CUSTOM_COLOR)		-- draw point for altitude			
+			previous_yPos = y
 		end
+--		previous_xPos = xPos
+--		previous_yPos = yPos
 	end
 --  --------------------------------
 --	  calculate and display values
